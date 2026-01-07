@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+
+volumes:
+
+networks:
+  my-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
+          gateway: 10.5.0.1
+    name: gureev-ua-my-netology-hw

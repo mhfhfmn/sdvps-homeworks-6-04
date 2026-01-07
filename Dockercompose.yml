@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  prometheus:
+    container_name: gureev-ua-netology-prometheus
+    image: prom/prometheus:v2.47.2
+    ports:
+      - "9090:9090"
+    # Необходимо указать для доступа к создаваемому volume на запись приложению, можно заменить на UID:GID пользователя
+    # владельца каталогов prometheus-data
+    #user: "1000:1000"
+    user: "0:0"
+    volumes:
+      - ./prometheus-data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
+    networks:
+      monitoring:
+        ipv4_address: 10.5.0.2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  pushgateway:
+    container_name: gureev-ua-netology-pushgateway
+    image: prom/pushgateway:latest
+    ports:
+      - "9091:9091"
+    networks:
+      monitoring:
+        ipv4_address: 10.5.0.3
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  grafana:
+    container_name: gureev-ua-netology-grafana
+    image: grafana/grafana:latest
+    ports:
+      - "80:3000"
+    # Необходимо указать для доступа к создаваемому volume на запись приложению, можно заменить на UID:GID пользователя
+    # владельца каталогов grafana-data
+    #user: "1000:1000"
+    user: "0:0"
+    
+    volumes:
+      - ./grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/custom.ini:/etc/grafana/grafana.ini:ro
+    environment:
+      - GF_PATHS_CONFIG=/etc/grafana/grafana.ini
+    networks:
+      monitoring:
+        ipv4_address: 10.5.0.4
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+
+networks:
+  monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
+          gateway: 10.5.0.1
+    name: gureev-ua-my-netology-hw
